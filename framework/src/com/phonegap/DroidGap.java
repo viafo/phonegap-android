@@ -9,12 +9,12 @@ package com.phonegap;
 
 import org.json.JSONArray;
 import org.json.JSONException;
+
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.res.Configuration;
-import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.media.AudioManager;
 import android.net.Uri;
@@ -25,19 +25,21 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
+import android.webkit.GeolocationPermissions.Callback;
+import android.webkit.JsPromptResult;
 import android.webkit.JsResult;
 import android.webkit.WebChromeClient;
-import android.webkit.JsPromptResult;
 import android.webkit.WebSettings;
+import android.webkit.WebSettings.LayoutAlgorithm;
 import android.webkit.WebStorage;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
-import android.webkit.GeolocationPermissions.Callback;
-import android.webkit.WebSettings.LayoutAlgorithm;
 import android.widget.LinearLayout;
+
+import com.phonegap.api.PhonegapActivity;
 import com.phonegap.api.Plugin;
 import com.phonegap.api.PluginManager;
-import com.phonegap.api.PhonegapActivity;
+import com.smaato.SOMA.SOMABanner;
 
 /**
  * This class is the main Android activity that represents the PhoneGap
@@ -109,6 +111,7 @@ public class DroidGap extends PhonegapActivity {
 	// The webview for our app
 	protected WebView appView;
 	protected WebViewClient webViewClient;
+	protected SOMABanner somaBanner;
 
 	protected LinearLayout root;
 	public boolean bound = false;
@@ -188,8 +191,30 @@ public class DroidGap extends PhonegapActivity {
     /**
      * Create and initialize web container.
      */
-	public void init() {
-		
+    public void init() {
+            
+        if (this.getBooleanProperty("SOMAEnabled", false)) {
+            final float scale = this.getResources().getDisplayMetrics().density;
+            String pubId = this.getStringProperty("SOMAPubID", "0");
+            String adId = this.getStringProperty("SOMAAdID", "0");
+            
+            // Create SOMA Banner
+            this.somaBanner = new SOMABanner(DroidGap.this);
+            this.somaBanner.setId(200);
+            this.somaBanner.setLayoutParams(new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.FILL_PARENT, (int) (50 * scale)));
+            // this.somaBanner.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+            this.somaBanner.setPubID(pubId);
+            this.somaBanner.setAdID(adId);
+            this.somaBanner.setSOMABackgroundColor(Color.BLACK);// set the
+                                                                // background color
+                                                                // the same as the
+                                                                // app's for a
+                                                                // better UI
+            this.somaBanner.setFontColor(Color.GRAY);
+            root.addView(this.somaBanner);
+        }
+
 		// Create web container
 		this.appView = new WebView(DroidGap.this);
 		this.appView.setId(100);
@@ -594,11 +619,25 @@ public class DroidGap extends PhonegapActivity {
     }
 
     @Override
+    protected void onStart() {
+        super.onStart();
+        if (this.somaBanner != null) {
+            this.somaBanner.setAutoRefresh(true);
+            this.somaBanner.setAnimationOn(false); // set animation to false
+            this.somaBanner.fetchDrawableOnThread(); // fetch a new ad.
+            this.somaBanner.nextAd(60); // to auto refresh the ad at 60s timer.
+        }
+    }
+
+    @Override
     /**
      * Called when the system is about to start resuming a previous activity. 
      */
     protected void onPause() {
         super.onPause();
+        if (this.somaBanner != null) {
+            this.somaBanner.setAutoRefresh(false);
+        }
        	// Send pause event to JavaScript
        	this.appView.loadUrl("javascript:try{PhoneGap.onPause.fire();}catch(e){};"); 
 
@@ -619,7 +658,9 @@ public class DroidGap extends PhonegapActivity {
      */
     protected void onResume() {
         super.onResume();
-
+        if (this.somaBanner != null) {
+            this.somaBanner.setAutoRefresh(true);
+        }
        	// Send resume event to JavaScript
        	this.appView.loadUrl("javascript:try{PhoneGap.onResume.fire();}catch(e){};");
 
@@ -640,6 +681,14 @@ public class DroidGap extends PhonegapActivity {
         }
     }
     
+    @Override
+    protected void onStop() {
+        if (this.somaBanner != null) {
+            this.somaBanner.setAutoRefresh(false);
+        }
+        super.onStop();
+    }
+
     @Override
     /**
      * The final call you receive before your activity is destroyed. 
