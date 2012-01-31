@@ -1,23 +1,34 @@
 /*
- * PhoneGap is available under *either* the terms of the modified BSD license *or* the
- * MIT License (2008). See http://opensource.org/licenses/alphabetical for full text.
- * 
- * Copyright (c) 2005-2010, Nitobi Software Inc.
- * Copyright (c) 2010, IBM Corporation
- */
+       Licensed to the Apache Software Foundation (ASF) under one
+       or more contributor license agreements.  See the NOTICE file
+       distributed with this work for additional information
+       regarding copyright ownership.  The ASF licenses this file
+       to you under the Apache License, Version 2.0 (the
+       "License"); you may not use this file except in compliance
+       with the License.  You may obtain a copy of the License at
+
+         http://www.apache.org/licenses/LICENSE-2.0
+
+       Unless required by applicable law or agreed to in writing,
+       software distributed under the License is distributed on an
+       "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+       KIND, either express or implied.  See the License for the
+       specific language governing permissions and limitations
+       under the License.
+*/
 package com.phonegap;
-
-import java.util.HashMap;
-import java.util.Map.Entry;
-
-import org.json.JSONArray;
-import org.json.JSONException;
-
-import com.phonegap.api.Plugin;
-import com.phonegap.api.PluginResult;
 
 import android.content.Context;
 import android.media.AudioManager;
+import com.phonegap.api.Plugin;
+import com.phonegap.api.PluginResult;
+import java.util.ArrayList;
+import org.json.JSONArray;
+import org.json.JSONException;
+
+import com.phonegap.api.LOG;
+import java.util.HashMap;
+import java.util.Map.Entry;
 
 /**
  * This class called by PhonegapActivity to play and record audio.  
@@ -32,13 +43,16 @@ import android.media.AudioManager;
  */
 public class AudioHandler extends Plugin {
 
+    public static String TAG = "AudioHandler";
 	HashMap<String,AudioPlayer> players;	// Audio player object
+	ArrayList<AudioPlayer> pausedForPhone;     // Audio players that were paused when phone call came in
 	
 	/**
 	 * Constructor.
 	 */
 	public AudioHandler() {
 		this.players = new HashMap<String,AudioPlayer>();
+		this.pausedForPhone = new ArrayList<AudioPlayer>();
 	}
 
 	/**
@@ -63,19 +77,27 @@ public class AudioHandler extends Plugin {
 			else if (action.equals("startPlayingAudio")) {
 				this.startPlayingAudio(args.getString(0), args.getString(1));
 			}
+			else if (action.equals("seekToAudio")) {
+				this.seekToAudio(args.getString(0), args.getInt(1));
+			}
 			else if (action.equals("pausePlayingAudio")) {
 				this.pausePlayingAudio(args.getString(0));
 			}
 			else if (action.equals("stopPlayingAudio")) {
 				this.stopPlayingAudio(args.getString(0));
-			}
-			else if (action.equals("getCurrentPositionAudio")) {
-				long l = this.getCurrentPositionAudio(args.getString(0));
-				return new PluginResult(status, l);
+			} else if (action.equals("setVolume")) {
+			   try {
+				   this.setVolume(args.getString(0), Float.parseFloat(args.getString(1)));
+			   } catch (NumberFormatException nfe) {
+				   //no-op
+			   }
+			} else if (action.equals("getCurrentPositionAudio")) {
+				float f = this.getCurrentPositionAudio(args.getString(0));
+				return new PluginResult(status, f);
 			}
 			else if (action.equals("getDurationAudio")) {
-				long l = this.getDurationAudio(args.getString(0), args.getString(1));
-				return new PluginResult(status, l);
+				float f = this.getDurationAudio(args.getString(0), args.getString(1));
+				return new PluginResult(status, f);
 			}
 			else if (action.equals("release")) {
 				boolean b = this.release(args.getString(0));
@@ -108,15 +130,45 @@ public class AudioHandler extends Plugin {
 	 * Stop all audio players and recorders.
 	 */
 	public void onDestroy() {
-		java.util.Set<Entry<String,AudioPlayer>> s = this.players.entrySet();
-        java.util.Iterator<Entry<String,AudioPlayer>> it = s.iterator();
-        while(it.hasNext()) {
-            Entry<String,AudioPlayer> entry = it.next();
-            AudioPlayer audio = entry.getValue();
+        for (AudioPlayer audio : this.players.values()) {
             audio.destroy();
-		}
+        }
         this.players.clear();
 	}
+	
+    /**
+     * Called when a message is sent to plugin. 
+     * 
+     * @param id            The message id
+     * @param data          The message data
+     */
+    public void onMessage(String id, Object data) {
+        
+        // If phone message
+        if (id.equals("telephone")) {
+            
+            // If phone ringing, then pause playing
+            if ("ringing".equals(data) || "offhook".equals(data)) {
+                
+                // Get all audio players and pause them
+                for (AudioPlayer audio : this.players.values()) {
+                    if (audio.getState() == AudioPlayer.MEDIA_RUNNING) {
+                        this.pausedForPhone.add(audio);
+                        audio.pausePlaying();
+                    }
+                }
+
+            }
+            
+            // If phone idle, then resume playing those players we paused
+            else if ("idle".equals(data)) {
+                for (AudioPlayer audio : this.pausedForPhone) {
+                    audio.startPlaying(null);
+                }
+                this.pausedForPhone.clear();
+            }
+        }
+    }
 
     //--------------------------------------------------------------------------
     // LOCAL METHODS
@@ -182,6 +234,20 @@ public class AudioHandler extends Plugin {
     }
 
     /**
+     * Seek to a location.
+     * 
+     * 
+	 * @param id				The id of the audio player
+	 * @param miliseconds		int: number of milliseconds to skip 1000 = 1 second
+     */
+    public void seekToAudio(String id, int milliseconds) {
+    	AudioPlayer audio = this.players.get(id);
+    	if (audio != null) {
+    		audio.seekToPlaying(milliseconds);
+    	}
+    }
+    
+    /**
      * Pause playing.
      * 
 	 * @param id				The id of the audio player
@@ -213,10 +279,10 @@ public class AudioHandler extends Plugin {
 	 * @param id				The id of the audio player
      * @return 					position in msec
      */
-    public long getCurrentPositionAudio(String id) {
+    public float getCurrentPositionAudio(String id) {
     	AudioPlayer audio = this.players.get(id);
     	if (audio != null) {
-    		return(audio.getCurrentPosition());
+    		return(audio.getCurrentPosition()/1000.0f);
     	}
     	return -1;
     }
@@ -228,7 +294,7 @@ public class AudioHandler extends Plugin {
      * @param file				The name of the audio file.
      * @return					The duration in msec.
      */
-    public long getDurationAudio(String id, String file) {
+    public float getDurationAudio(String id, String file) {
     	
     	// Get audio file
     	AudioPlayer audio = this.players.get(id);
@@ -278,5 +344,20 @@ public class AudioHandler extends Plugin {
 		else {
 			return -1;
 		}
-    }       
+    }
+
+    /**
+     * Set the volume for an audio device
+     *
+     * @param id				The id of the audio player
+     * @param volume            Volume to adjust to 0.0f - 1.0f
+     */
+    public void setVolume(String id, float volume) {
+        AudioPlayer audio = this.players.get(id);
+        if (audio != null) {
+            audio.setVolume(volume);
+        } else {
+            System.out.println("AudioHandler.setVolume() Error: Unknown Audio Player " + id);
+        }
+    }
 }

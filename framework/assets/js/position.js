@@ -1,10 +1,24 @@
 /*
- * PhoneGap is available under *either* the terms of the modified BSD license *or* the
- * MIT License (2008). See http://opensource.org/licenses/alphabetical for full text.
+ *     Licensed to the Apache Software Foundation (ASF) under one
+ *     or more contributor license agreements.  See the NOTICE file
+ *     distributed with this work for additional information
+ *     regarding copyright ownership.  The ASF licenses this file
+ *     to you under the Apache License, Version 2.0 (the
+ *     "License"); you may not use this file except in compliance
+ *     with the License.  You may obtain a copy of the License at
  *
- * Copyright (c) 2005-2010, Nitobi Software Inc.
- * Copyright (c) 2010, IBM Corporation
+ *       http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *     Unless required by applicable law or agreed to in writing,
+ *     software distributed under the License is distributed on an
+ *     "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *     KIND, either express or implied.  See the License for the
+ *     specific language governing permissions and limitations
+ *     under the License.
  */
+
+if (!PhoneGap.hasResource("position")) {
+PhoneGap.addResource("position");
 
 /**
  * This class contains position information.
@@ -17,12 +31,13 @@
  * @param {Object} vel
  * @constructor
  */
-function Position(coords, timestamp) {
+var Position = function(coords, timestamp) {
 	this.coords = coords;
 	this.timestamp = (timestamp !== 'undefined') ? timestamp : new Date().getTime();
-}
+};
 
-function Coordinates(lat, lng, alt, acc, head, vel, altacc) {
+/** @constructor */
+var Coordinates = function(lat, lng, alt, acc, head, vel, altacc) {
 	/**
 	 * The latitude of the position.
 	 */
@@ -50,14 +65,14 @@ function Coordinates(lat, lng, alt, acc, head, vel, altacc) {
 	/**
 	 * The altitude accuracy of the position.
 	 */
-	this.altitudeAccuracy = (altacc !== 'undefined') ? altacc : null; 
-}
+	this.altitudeAccuracy = (altacc !== 'undefined') ? altacc : null;
+};
 
 /**
  * This class specifies the options for requesting position data.
  * @constructor
  */
-function PositionOptions() {
+var PositionOptions = function() {
 	/**
 	 * Specifies the desired position accuracy.
 	 */
@@ -67,18 +82,19 @@ function PositionOptions() {
 	 * is called.
 	 */
 	this.timeout = 10000;
-}
+};
 
 /**
  * This class contains information about any GSP errors.
  * @constructor
  */
-function PositionError() {
+var PositionError = function() {
 	this.code = null;
 	this.message = "";
-}
+};
 
 PositionError.UNKNOWN_ERROR = 0;
 PositionError.PERMISSION_DENIED = 1;
 PositionError.POSITION_UNAVAILABLE = 2;
 PositionError.TIMEOUT = 3;
+}

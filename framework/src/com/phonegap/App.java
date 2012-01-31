@@ -1,17 +1,31 @@
 /*
- * PhoneGap is available under *either* the terms of the modified BSD license *or* the
- * MIT License (2008). See http://opensource.org/licenses/alphabetical for full text.
- * 
- * Copyright (c) 2005-2010, Nitobi Software Inc.
- * Copyright (c) 2010-2011, IBM Corporation
- */
+       Licensed to the Apache Software Foundation (ASF) under one
+       or more contributor license agreements.  See the NOTICE file
+       distributed with this work for additional information
+       regarding copyright ownership.  The ASF licenses this file
+       to you under the Apache License, Version 2.0 (the
+       "License"); you may not use this file except in compliance
+       with the License.  You may obtain a copy of the License at
+
+         http://www.apache.org/licenses/LICENSE-2.0
+
+       Unless required by applicable law or agreed to in writing,
+       software distributed under the License is distributed on an
+       "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+       KIND, either express or implied.  See the License for the
+       specific language governing permissions and limitations
+       under the License.
+*/
+
 package com.phonegap;
 
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+import com.phonegap.api.LOG;
 import com.phonegap.api.Plugin;
 import com.phonegap.api.PluginResult;
+import java.util.HashMap;
 
 /**
  * This class exposes methods in DroidGap that can be called from JavaScript.
@@ -43,8 +57,8 @@ public class App extends Plugin {
         	else if (action.equals("clearHistory")) {
             	this.clearHistory();
             }
-        	else if (action.equals("addService")) {
-            	this.addService(args.getString(0), args.getString(1));
+            else if (action.equals("backHistory")) {
+                this.backHistory();
             }
         	else if (action.equals("overrideBackbutton")) {
             	this.overrideBackbutton(args.getBoolean(0));
@@ -73,18 +87,21 @@ public class App extends Plugin {
 		((DroidGap)this.ctx).clearCache();
 	}
 	
-    /**
-     * Load the url into the webview.
-     * 
-     * @param url
-     * @param props			Properties that can be passed in to the DroidGap activity (i.e. loadingDialog, wait, ...)
-     * @throws JSONException 
-     */
+	/**
+	 * Load the url into the webview.
+	 * 
+	 * @param url
+	 * @param props			Properties that can be passed in to the DroidGap activity (i.e. loadingDialog, wait, ...)
+	 * @throws JSONException 
+	 */
 	public void loadUrl(String url, JSONObject props) throws JSONException {
-		System.out.println("App.loadUrl("+url+","+props+")");
+		LOG.d("App", "App.loadUrl("+url+","+props+")");
 		int wait = 0;
-		
+		boolean openExternal = false;
+		boolean clearHistory = false;
+
 		// If there are properties, then set them on the Activity
+		HashMap<String, Object> params = new HashMap<String, Object>();
 		if (props != null) {
 			JSONArray keys = props.names();
 			for (int i=0; i<keys.length(); i++) {
@@ -92,31 +109,42 @@ public class App extends Plugin {
 				if (key.equals("wait")) {
 					wait = props.getInt(key);
 				}
+				else if (key.equalsIgnoreCase("openexternal")) {
+					openExternal = props.getBoolean(key);
+				}
+				else if (key.equalsIgnoreCase("clearhistory")) {
+					clearHistory = props.getBoolean(key);
+				}
 				else {
 					Object value = props.get(key);
 					if (value == null) {
-						
+
 					}
 					else if (value.getClass().equals(String.class)) {
-						this.ctx.getIntent().putExtra(key, (String)value);
+						params.put(key, (String)value);
 					}
 					else if (value.getClass().equals(Boolean.class)) {
-						this.ctx.getIntent().putExtra(key, (Boolean)value);
+						params.put(key, (Boolean)value);
 					}
 					else if (value.getClass().equals(Integer.class)) {
-						this.ctx.getIntent().putExtra(key, (Integer)value);
+						params.put(key, (Integer)value);
 					}
 				}
 			}
 		}
-		
+
 		// If wait property, then delay loading
+
 		if (wait > 0) {
-			((DroidGap)this.ctx).loadUrl(url, wait);
+			try {
+				synchronized(this) {
+					this.wait(wait);
+				}
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
 		}
-		else {
-			((DroidGap)this.ctx).loadUrl(url);
-		}
+		((DroidGap)this.ctx).showWebPage(url, openExternal, clearHistory, params);
 	}
 
 	/**
@@ -127,22 +155,20 @@ public class App extends Plugin {
 	}
 	
     /**
-     * Clear web history in this web view.
+     * Clear page history for the app.
      */
     public void clearHistory() {
     	((DroidGap)this.ctx).clearHistory();
     }
-
-    /**
-     * Add a class that implements a service.
-     * 
-     * @param serviceType
-     * @param className
-     */
-    public void addService(String serviceType, String className) {
-    	this.ctx.addService(serviceType, className);
-    }
     
+    /**
+     * Go to previous page displayed.
+     * This is the same as pressing the backbutton on Android device.
+     */
+    public void backHistory() {
+        ((DroidGap)this.ctx).backHistory();
+    }
+
     /**
      * Override the default behavior of the Android back button.
      * If overridden, when the back button is pressed, the "backKeyDown" JavaScript event will be fired.
@@ -150,7 +176,7 @@ public class App extends Plugin {
      * @param override		T=override, F=cancel override
      */
     public void overrideBackbutton(boolean override) {
-    	System.out.println("WARNING: Back Button Default Behaviour will be overridden.  The backbutton event will be fired!");
+    	LOG.i("DroidGap", "WARNING: Back Button Default Behaviour will be overridden.  The backbutton event will be fired!");
     	((DroidGap)this.ctx).bound = override;
     }
 
@@ -167,7 +193,6 @@ public class App extends Plugin {
      * Exit the Android application.
      */
     public void exitApp() {
-    	((DroidGap)this.ctx).finish();
+    	((DroidGap)this.ctx).endActivity();
     }
-
 }

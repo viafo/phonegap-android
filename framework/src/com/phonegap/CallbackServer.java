@@ -1,19 +1,34 @@
 /*
- * PhoneGap is available under *either* the terms of the modified BSD license *or* the
- * MIT License (2008). See http://opensource.org/licenses/alphabetical for full text.
- * 
- * Copyright (c) 2005-2010, Nitobi Software Inc.
- * Copyright (c) 2010, IBM Corporation
- */
+       Licensed to the Apache Software Foundation (ASF) under one
+       or more contributor license agreements.  See the NOTICE file
+       distributed with this work for additional information
+       regarding copyright ownership.  The ASF licenses this file
+       to you under the Apache License, Version 2.0 (the
+       "License"); you may not use this file except in compliance
+       with the License.  You may obtain a copy of the License at
+
+         http://www.apache.org/licenses/LICENSE-2.0
+
+       Unless required by applicable law or agreed to in writing,
+       software distributed under the License is distributed on an
+       "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+       KIND, either express or implied.  See the License for the
+       specific language governing permissions and limitations
+       under the License.
+*/
 package com.phonegap;
 
 import java.io.BufferedReader;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.UnsupportedEncodingException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.URLEncoder;
 import java.util.LinkedList;
+
+import android.util.Log;
 
 /**
  * This class provides a way for Java to run JavaScript in the web page that has loaded PhoneGap.
@@ -41,6 +56,8 @@ import java.util.LinkedList;
  */
 public class CallbackServer implements Runnable {
 	
+	private static final String LOG_TAG = "CallbackServer";
+
 	/**
 	 * The list of JavaScript statements to be sent to JavaScript.
 	 */
@@ -97,6 +114,10 @@ public class CallbackServer implements Runnable {
 	 */
 	public void init(String url) {
 		//System.out.println("CallbackServer.start("+url+")");
+		this.active = false;
+		this.empty = true;
+		this.port = 0;
+		this.javascript = new LinkedList<String>();		
 
 		// Determine if XHR or polling is to be used
 		if ((url != null) && !url.startsWith("file://")) {
@@ -111,6 +132,16 @@ public class CallbackServer implements Runnable {
 			this.usePolling = false;
 			this.startServer();
 		}
+	}
+	
+    /**
+     * Re-init when loading a new HTML page into webview.
+     * 
+     * @param url           The URL of the PhoneGap app being loaded
+     */
+	public void reinit(String url) {
+	    this.stopServer();
+	    this.init(url);
 	}
 	
 	/**
@@ -221,7 +252,11 @@ public class CallbackServer implements Runnable {
 								 }
 								 else {
 									 //System.out.println("CallbackServer -- sending item");
-									 response = "HTTP/1.1 200 OK\r\n\r\n"+this.getJavascript();
+									 response = "HTTP/1.1 200 OK\r\n\r\n";
+									 String js = this.getJavascript();
+									 if (js != null) {
+										 response += encode(js, "UTF-8");
+									 }
 								 }
 							 }
 							 else {
@@ -317,4 +352,81 @@ public class CallbackServer implements Runnable {
 		}
 	}
 	
+	/* The Following code has been modified from original implementation of URLEncoder */
+	
+	/* start */
+	
+	/*
+     *  Licensed to the Apache Software Foundation (ASF) under one or more
+     *  contributor license agreements.  See the NOTICE file distributed with
+     *  this work for additional information regarding copyright ownership.
+     *  The ASF licenses this file to You under the Apache License, Version 2.0
+     *  (the "License"); you may not use this file except in compliance with
+     *  the License.  You may obtain a copy of the License at
+     *
+     *     http://www.apache.org/licenses/LICENSE-2.0
+     *
+     *  Unless required by applicable law or agreed to in writing, software
+     *  distributed under the License is distributed on an "AS IS" BASIS,
+     *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+     *  See the License for the specific language governing permissions and
+     *  limitations under the License.
+     */
+	static final String digits = "0123456789ABCDEF";
+
+    /**
+     * This will encode the return value to JavaScript.  We revert the encoding for 
+     * common characters that don't require encoding to reduce the size of the string 
+     * being passed to JavaScript.
+     * 
+     * @param s to be encoded
+     * @param enc encoding type
+     * @return encoded string
+     */
+	public static String encode(String s, String enc) throws UnsupportedEncodingException {
+        if (s == null || enc == null) {
+            throw new NullPointerException();
+        }
+        // check for UnsupportedEncodingException
+        "".getBytes(enc);
+        
+        // Guess a bit bigger for encoded form
+        StringBuilder buf = new StringBuilder(s.length() + 16);
+        int start = -1;
+        for (int i = 0; i < s.length(); i++) {
+            char ch = s.charAt(i);
+            if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z')
+                    || (ch >= '0' && ch <= '9')
+                    || " .-*_'(),<>=?@[]{}:~\"\\/;!".indexOf(ch) > -1) {
+                if (start >= 0) {
+                    convert(s.substring(start, i), buf, enc);
+                    start = -1;
+                }
+                if (ch != ' ') {
+                    buf.append(ch);
+                } else {
+                    buf.append(' ');
+                }
+            } else {
+                if (start < 0) {
+                    start = i;
+                }
+            }
+        }
+        if (start >= 0) {
+            convert(s.substring(start, s.length()), buf, enc);
+        }
+        return buf.toString();
+    }
+
+    private static void convert(String s, StringBuilder buf, String enc) throws UnsupportedEncodingException {
+        byte[] bytes = s.getBytes(enc);
+        for (int j = 0; j < bytes.length; j++) {
+            buf.append('%');
+            buf.append(digits.charAt((bytes[j] & 0xf0) >> 4));
+            buf.append(digits.charAt(bytes[j] & 0xf));
+        }
+    }
+    
+    /* end */
 }

@@ -1,9 +1,20 @@
 /*
- * PhoneGap is available under *either* the terms of the modified BSD license *or* the
- * MIT License (2008). See http://opensource.org/licenses/alphabetical for full text.
+ *     Licensed to the Apache Software Foundation (ASF) under one
+ *     or more contributor license agreements.  See the NOTICE file
+ *     distributed with this work for additional information
+ *     regarding copyright ownership.  The ASF licenses this file
+ *     to you under the Apache License, Version 2.0 (the
+ *     "License"); you may not use this file except in compliance
+ *     with the License.  You may obtain a copy of the License at
  *
- * Copyright (c) 2005-2010, Nitobi Software Inc.
- * Copyright (c) 2010, IBM Corporation
+ *       http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *     Unless required by applicable law or agreed to in writing,
+ *     software distributed under the License is distributed on an
+ *     "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *     KIND, either express or implied.  See the License for the
+ *     specific language governing permissions and limitations
+ *     under the License.
  */
 
 /*
@@ -12,9 +23,42 @@
  * most manufacturers ship with Android 1.5 and do not do OTA Updates, this is required
  */
 
+if (!PhoneGap.hasResource("storage")) {
+PhoneGap.addResource("storage");
+
+/**
+ * SQL result set object
+ * PRIVATE METHOD
+ * @constructor
+ */
+var DroidDB_Rows = function() {
+    this.resultSet = [];    // results array
+    this.length = 0;        // number of rows
+};
+
+/**
+ * Get item from SQL result set
+ *
+ * @param row           The row number to return
+ * @return              The row object
+ */
+DroidDB_Rows.prototype.item = function(row) {
+    return this.resultSet[row];
+};
+
+/**
+ * SQL result set that is returned to user.
+ * PRIVATE METHOD
+ * @constructor
+ */
+var DroidDB_Result = function() {
+    this.rows = new DroidDB_Rows();
+};
+
 /**
  * Storage object that is called by native code when performing queries.
  * PRIVATE METHOD
+ * @constructor
  */
 var DroidDB = function() {
     this.queryQueue = {};
@@ -100,8 +144,39 @@ DroidDB.prototype.fail = function(reason, id) {
 };
 
 /**
+ * SQL query object
+ * PRIVATE METHOD
+ *
+ * @constructor
+ * @param tx                The transaction object that this query belongs to
+ */
+var DroidDB_Query = function(tx) {
+
+    // Set the id of the query
+    this.id = PhoneGap.createUUID();
+
+    // Add this query to the queue
+    droiddb.queryQueue[this.id] = this;
+
+    // Init result
+    this.resultSet = [];
+
+    // Set transaction that this query belongs to
+    this.tx = tx;
+
+    // Add this query to transaction list
+    this.tx.queryList[this.id] = this;
+
+    // Callbacks
+    this.successCallback = null;
+    this.errorCallback = null;
+
+};
+
+/**
  * Transaction object
  * PRIVATE METHOD
+ * @constructor
  */
 var DroidDB_Tx = function() {
 
@@ -115,37 +190,6 @@ var DroidDB_Tx = function() {
     // Query list
     this.queryList = {};
 };
-
-
-var DatabaseShell = function() {
-};
-
-/**
- * Start a transaction.
- * Does not support rollback in event of failure.
- *
- * @param process {Function}            The transaction function
- * @param successCallback {Function}
- * @param errorCallback {Function}
- */
-DatabaseShell.prototype.transaction = function(process, errorCallback, successCallback) {
-    var tx = new DroidDB_Tx();
-    tx.successCallback = successCallback;
-    tx.errorCallback = errorCallback;
-    try {
-        process(tx);
-    } catch (e) {
-        console.log("Transaction error: "+e);
-        if (tx.errorCallback) {
-            try {
-                tx.errorCallback(e);
-            } catch (ex) {
-                console.log("Transaction error calling user error callback: "+e);
-            }
-        }
-    }
-};
-
 
 /**
  * Mark query in transaction as complete.
@@ -162,7 +206,7 @@ DroidDB_Tx.prototype.queryComplete = function(id) {
         var i;
         for (i in this.queryList) {
             if (this.queryList.hasOwnProperty(i)) {
-                count++;   
+                count++;
             }
         }
         if (count === 0) {
@@ -199,35 +243,6 @@ DroidDB_Tx.prototype.queryFailed = function(id, reason) {
 };
 
 /**
- * SQL query object
- * PRIVATE METHOD
- *
- * @param tx                The transaction object that this query belongs to
- */
-var DroidDB_Query = function(tx) {
-
-    // Set the id of the query
-    this.id = PhoneGap.createUUID();
-
-    // Add this query to the queue
-    droiddb.queryQueue[this.id] = this;
-
-    // Init result
-    this.resultSet = [];
-
-    // Set transaction that this query belongs to
-    this.tx = tx;
-
-    // Add this query to transaction list
-    this.tx.queryList[this.id] = this;
-
-    // Callbacks
-    this.successCallback = null;
-    this.errorCallback = null;
-
-};
-
-/**
  * Execute SQL statement
  *
  * @param sql                   SQL statement to execute
@@ -254,31 +269,33 @@ DroidDB_Tx.prototype.executeSql = function(sql, params, successCallback, errorCa
     PhoneGap.exec(null, null, "Storage", "executeSql", [sql, params, query.id]);
 };
 
-/**
- * SQL result set that is returned to user.
- * PRIVATE METHOD
- */
-DroidDB_Result = function() {
-    this.rows = new DroidDB_Rows();
+var DatabaseShell = function() {
 };
 
 /**
- * SQL result set object
- * PRIVATE METHOD
- */
-DroidDB_Rows = function() {
-    this.resultSet = [];    // results array
-    this.length = 0;        // number of rows
-};
-
-/**
- * Get item from SQL result set
+ * Start a transaction.
+ * Does not support rollback in event of failure.
  *
- * @param row           The row number to return
- * @return              The row object
+ * @param process {Function}            The transaction function
+ * @param successCallback {Function}
+ * @param errorCallback {Function}
  */
-DroidDB_Rows.prototype.item = function(row) {
-    return this.resultSet[row];
+DatabaseShell.prototype.transaction = function(process, errorCallback, successCallback) {
+    var tx = new DroidDB_Tx();
+    tx.successCallback = successCallback;
+    tx.errorCallback = errorCallback;
+    try {
+        process(tx);
+    } catch (e) {
+        console.log("Transaction error: "+e);
+        if (tx.errorCallback) {
+            try {
+                tx.errorCallback(e);
+            } catch (ex) {
+                console.log("Transaction error calling user error callback: "+e);
+            }
+        }
+    }
 };
 
 /**
@@ -290,106 +307,133 @@ DroidDB_Rows.prototype.item = function(row) {
  * @param size              Database size in bytes
  * @return                  Database object
  */
-DroidDB_openDatabase = function(name, version, display_name, size) {
+var DroidDB_openDatabase = function(name, version, display_name, size) {
     PhoneGap.exec(null, null, "Storage", "openDatabase", [name, version, display_name, size]);
     var db = new DatabaseShell();
     return db;
 };
 
-
 /**
- * For browsers with no localStorage we emulate it with SQLite. Follows the w3c api. 
- * TODO: Do similar for sessionStorage. 
+ * For browsers with no localStorage we emulate it with SQLite. Follows the w3c api.
+ * TODO: Do similar for sessionStorage.
  */
 
+/**
+ * @constructor
+ */
 var CupcakeLocalStorage = function() {
-		try {
+    try {
 
-			this.db = openDatabase('localStorage', '1.0', 'localStorage', 2621440);	
-			var storage = {};
-			this.length = 0;
-			function setLength (length) {
-				this.length = length;
-				localStorage.length = length;
-			}
-			this.db.transaction(
-				function (transaction) {
-				    var i;
-					transaction.executeSql('CREATE TABLE IF NOT EXISTS storage (id NVARCHAR(40) PRIMARY KEY, body NVARCHAR(255))');
-					transaction.executeSql('SELECT * FROM storage', [], function(tx, result) {
-						for(var i = 0; i < result.rows.length; i++) {
-							storage[result.rows.item(i)['id']] =  result.rows.item(i)['body'];
-						}
-						setLength(result.rows.length);
-						PhoneGap.initializationComplete("cupcakeStorage");
-					});
-					
-				}, 
-				function (err) {
-					alert(err.message);
-				}
-			);
-			this.setItem = function(key, val) {
-				if (typeof(storage[key])=='undefined') {
-					this.length++;
-				}
-				storage[key] = val;
-				this.db.transaction(
-					function (transaction) {
-						transaction.executeSql('CREATE TABLE IF NOT EXISTS storage (id NVARCHAR(40) PRIMARY KEY, body NVARCHAR(255))');
-						transaction.executeSql('REPLACE INTO storage (id, body) values(?,?)', [key,val]);
-					}
-				);
-			};
-			this.getItem = function(key) {			
-				return storage[key];
-			};
-			this.removeItem = function(key) {
-				delete storage[key];
-				this.length--;
-				this.db.transaction(
-					function (transaction) {
-						transaction.executeSql('CREATE TABLE IF NOT EXISTS storage (id NVARCHAR(40) PRIMARY KEY, body NVARCHAR(255))');
-						transaction.executeSql('DELETE FROM storage where id=?', [key]);
-					}
-				);
-			};
-			this.clear = function() {
-				storage = {};
-				this.length = 0;
-				this.db.transaction(
-					function (transaction) {
-						transaction.executeSql('CREATE TABLE IF NOT EXISTS storage (id NVARCHAR(40) PRIMARY KEY, body NVARCHAR(255))');
-						transaction.executeSql('DELETE FROM storage', []);
-					}
-				);
-			};
-			this.key = function(index) {
-				var i = 0;
-				for (var j in storage) {
-					if (i==index) {
-						return j;
-					} else {
-						i++;
-					}
-				}
-				return null;
-			}
+      this.db = openDatabase('localStorage', '1.0', 'localStorage', 2621440);
+      var storage = {};
+      this.length = 0;
+      function setLength (length) {
+        this.length = length;
+        localStorage.length = length;
+      }
+      this.db.transaction(
+        function (transaction) {
+            var i;
+          transaction.executeSql('CREATE TABLE IF NOT EXISTS storage (id NVARCHAR(40) PRIMARY KEY, body NVARCHAR(255))');
+          transaction.executeSql('SELECT * FROM storage', [], function(tx, result) {
+            for(var i = 0; i < result.rows.length; i++) {
+              storage[result.rows.item(i)['id']] =  result.rows.item(i)['body'];
+            }
+            setLength(result.rows.length);
+            PhoneGap.initializationComplete("cupcakeStorage");
+          });
 
-		} catch(e) {
-			alert("Database error "+e+".");
-		    return;
-		}
+        },
+        function (err) {
+          alert(err.message);
+        }
+      );
+      this.setItem = function(key, val) {
+        if (typeof(storage[key])=='undefined') {
+          this.length++;
+        }
+        storage[key] = val;
+        this.db.transaction(
+          function (transaction) {
+            transaction.executeSql('CREATE TABLE IF NOT EXISTS storage (id NVARCHAR(40) PRIMARY KEY, body NVARCHAR(255))');
+            transaction.executeSql('REPLACE INTO storage (id, body) values(?,?)', [key,val]);
+          }
+        );
+      };
+      this.getItem = function(key) {
+        return storage[key];
+      };
+      this.removeItem = function(key) {
+        delete storage[key];
+        this.length--;
+        this.db.transaction(
+          function (transaction) {
+            transaction.executeSql('CREATE TABLE IF NOT EXISTS storage (id NVARCHAR(40) PRIMARY KEY, body NVARCHAR(255))');
+            transaction.executeSql('DELETE FROM storage where id=?', [key]);
+          }
+        );
+      };
+      this.clear = function() {
+        storage = {};
+        this.length = 0;
+        this.db.transaction(
+          function (transaction) {
+            transaction.executeSql('CREATE TABLE IF NOT EXISTS storage (id NVARCHAR(40) PRIMARY KEY, body NVARCHAR(255))');
+            transaction.executeSql('DELETE FROM storage', []);
+          }
+        );
+      };
+      this.key = function(index) {
+        var i = 0;
+        for (var j in storage) {
+          if (i==index) {
+            return j;
+          } else {
+            i++;
+          }
+        }
+        return null;
+      };
+
+    } catch(e) {
+      alert("Database error "+e+".");
+        return;
+    }
 };
+
 PhoneGap.addConstructor(function() {
-	  if (typeof window.openDatabase === "undefined" || window.openDatabase("test", "1.0", "TestDB", 1000) == null) {
+    var setupDroidDB = function() {
         navigator.openDatabase = window.openDatabase = DroidDB_openDatabase;
         window.droiddb = new DroidDB();
     }
+    if (typeof window.openDatabase === "undefined") {
+        setupDroidDB();
+    } else {
+        window.openDatabase_orig = window.openDatabase;
+        window.openDatabase = function(name, version, desc, size){
+            // Some versions of Android will throw a SECURITY_ERR so we need 
+            // to catch the exception and seutp our own DB handling.
+            var db = null;
+            try {
+                db = window.openDatabase_orig(name, version, desc, size);
+            } 
+            catch (ex) {
+                db = null;
+            }
+
+            if (db == null) {
+                setupDroidDB();
+                return DroidDB_openDatabase(name, version, desc, size);
+            }
+            else {
+                return db;
+            }
+        };
+    }
     
-    if (typeof window.localStorage === "undefined") {
+    if ((typeof window.localStorage == "undefined") || (window.localStorage == null)) {
         navigator.localStorage = window.localStorage = new CupcakeLocalStorage();
         PhoneGap.waitForInitialization("cupcakeStorage");
     }
 });
-
+}

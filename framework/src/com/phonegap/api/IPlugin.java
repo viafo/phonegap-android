@@ -1,10 +1,21 @@
 /*
- * PhoneGap is available under *either* the terms of the modified BSD license *or* the
- * MIT License (2008). See http://opensource.org/licenses/alphabetical for full text.
- * 
- * Copyright (c) 2005-2010, Nitobi Software Inc.
- * Copyright (c) 2010, IBM Corporation
- */
+       Licensed to the Apache Software Foundation (ASF) under one
+       or more contributor license agreements.  See the NOTICE file
+       distributed with this work for additional information
+       regarding copyright ownership.  The ASF licenses this file
+       to you under the Apache License, Version 2.0 (the
+       "License"); you may not use this file except in compliance
+       with the License.  You may obtain a copy of the License at
+
+         http://www.apache.org/licenses/LICENSE-2.0
+
+       Unless required by applicable law or agreed to in writing,
+       software distributed under the License is distributed on an
+       "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+       KIND, either express or implied.  See the License for the
+       specific language governing permissions and limitations
+       under the License.
+*/
 package com.phonegap.api;
 
 import org.json.JSONArray;
@@ -54,19 +65,36 @@ public interface IPlugin {
 
     /**
      * Called when the system is about to start resuming a previous activity. 
+     * 
+     * @param multitasking		Flag indicating if multitasking is turned on for app
      */
-    void onPause();
+    void onPause(boolean multitasking);
 
     /**
      * Called when the activity will start interacting with the user. 
+     * 
+     * @param multitasking		Flag indicating if multitasking is turned on for app
      */
-    void onResume();
+    void onResume(boolean multitasking);
     
+    /**
+     * Called when the activity receives a new intent. 
+     */
+    void onNewIntent(Intent intent);
+
     /**
      * The final call you receive before your activity is destroyed. 
      */
     void onDestroy();
 	
+    /**
+     * Called when a message is sent to plugin. 
+     * 
+     * @param id            The message id
+     * @param data          The message data
+     */
+    public void onMessage(String id, Object data);
+
     /**
      * Called when an activity you launched exits, giving you the requestCode you started it with,
      * the resultCode it returned, and any additional data from it. 
@@ -78,4 +106,11 @@ public interface IPlugin {
      */
     void onActivityResult(int requestCode, int resultCode, Intent intent);
 
+    /**
+     * By specifying a <url-filter> in plugins.xml you can map a URL (using startsWith atm) to this method.
+     * 
+     * @param url				The URL that is trying to be loaded in the PhoneGap webview.
+     * @return					Return true to prevent the URL from loading. Default is false.
+     */
+    boolean onOverrideUrlLoading(String url);
 }

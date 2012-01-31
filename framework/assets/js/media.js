@@ -1,68 +1,29 @@
 /*
- * PhoneGap is available under *either* the terms of the modified BSD license *or* the
- * MIT License (2008). See http://opensource.org/licenses/alphabetical for full text.
+ *     Licensed to the Apache Software Foundation (ASF) under one
+ *     or more contributor license agreements.  See the NOTICE file
+ *     distributed with this work for additional information
+ *     regarding copyright ownership.  The ASF licenses this file
+ *     to you under the Apache License, Version 2.0 (the
+ *     "License"); you may not use this file except in compliance
+ *     with the License.  You may obtain a copy of the License at
  *
- * Copyright (c) 2005-2010, Nitobi Software Inc.
- * Copyright (c) 2010, IBM Corporation
- */
-
-/**
- * List of media objects.
- * PRIVATE
- */
-PhoneGap.mediaObjects = {};
-
-/**
- * Object that receives native callbacks.
- * PRIVATE
- */
-PhoneGap.Media = function() {};
-
-/**
- * Get the media object.
- * PRIVATE
+ *       http://www.apache.org/licenses/LICENSE-2.0
  *
- * @param id            The media object id (string)
+ *     Unless required by applicable law or agreed to in writing,
+ *     software distributed under the License is distributed on an
+ *     "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *     KIND, either express or implied.  See the License for the
+ *     specific language governing permissions and limitations
+ *     under the License.
  */
-PhoneGap.Media.getMediaObject = function(id) {
-    return PhoneGap.mediaObjects[id];
-};
 
-/**
- * Audio has status update.
- * PRIVATE
- *
- * @param id            The media object id (string)
- * @param status        The status code (int)
- * @param msg           The status message (string)
- */
-PhoneGap.Media.onStatus = function(id, msg, value) {
-    var media = PhoneGap.mediaObjects[id];
-
-    // If state update
-    if (msg === Media.MEDIA_STATE) {
-        if (value === Media.MEDIA_STOPPED) {
-            if (media.successCallback) {
-                media.successCallback();
-            }
-        }
-        if (media.statusCallback) {
-            media.statusCallback(value);
-        }
-    }
-    else if (msg === Media.MEDIA_DURATION) {
-        media._duration = value;
-    }
-    else if (msg === Media.MEDIA_ERROR) {
-        if (media.errorCallback) {
-            media.errorCallback(value);
-        }
-    }
-};
+if (!PhoneGap.hasResource("media")) {
+PhoneGap.addResource("media");
 
 /**
  * This class provides access to the device media, interfaces to both sound and video
  *
+ * @constructor
  * @param src                   The file name or url to play
  * @param successCallback       The callback to be called when the file is done playing or recording.
  *                                  successCallback() - OPTIONAL
@@ -73,7 +34,7 @@ PhoneGap.Media.onStatus = function(id, msg, value) {
  * @param positionCallback      The callback to be called when media position has changed.
  *                                  positionCallback(long position) - OPTIONAL
  */
-Media = function(src, successCallback, errorCallback, statusCallback, positionCallback) {
+var Media = function(src, successCallback, errorCallback, statusCallback, positionCallback) {
 
     // successCallback optional
     if (successCallback && (typeof successCallback !== "function")) {
@@ -113,6 +74,7 @@ Media = function(src, successCallback, errorCallback, statusCallback, positionCa
 // Media messages
 Media.MEDIA_STATE = 1;
 Media.MEDIA_DURATION = 2;
+Media.MEDIA_POSITION = 3;
 Media.MEDIA_ERROR = 9;
 
 // Media states
@@ -128,11 +90,12 @@ Media.MEDIA_MSG = ["None", "Starting", "Running", "Paused", "Stopped"];
  * This class contains information about any Media errors.
  * @constructor
  */
-function MediaError() {
+var MediaError = function() {
     this.code = null;
     this.message = "";
-}
+};
 
+MediaError.MEDIA_ERR_NONE_ACTIVE    = 0;
 MediaError.MEDIA_ERR_ABORTED        = 1;
 MediaError.MEDIA_ERR_NETWORK        = 2;
 MediaError.MEDIA_ERR_DECODE         = 3;
@@ -150,6 +113,13 @@ Media.prototype.play = function() {
  */
 Media.prototype.stop = function() {
     return PhoneGap.exec(null, null, "Media", "stopPlayingAudio", [this.id]);
+};
+
+/**
+ * Seek or jump to a new time in the track..
+ */
+Media.prototype.seekTo = function(milliseconds) {
+    PhoneGap.exec(null, null, "Media", "seekToAudio", [this.id, milliseconds]);
 };
 
 /**
@@ -171,8 +141,6 @@ Media.prototype.getDuration = function() {
 
 /**
  * Get position of audio.
- *
- * @return
  */
 Media.prototype.getCurrentPosition = function(success, fail) {
     PhoneGap.exec(success, fail, "Media", "getCurrentPositionAudio", [this.id]);
@@ -199,3 +167,67 @@ Media.prototype.release = function() {
     PhoneGap.exec(null, null, "Media", "release", [this.id]);
 };
 
+/**
+ * Adjust the volume.
+ */
+Media.prototype.setVolume = function(volume) {
+    PhoneGap.exec(null, null, "Media", "setVolume", [this.id, volume]);
+};
+
+/**
+ * List of media objects.
+ * PRIVATE
+ */
+PhoneGap.mediaObjects = {};
+
+/**
+ * Object that receives native callbacks.
+ * PRIVATE
+ * @constructor
+ */
+PhoneGap.Media = function() {};
+
+/**
+ * Get the media object.
+ * PRIVATE
+ *
+ * @param id            The media object id (string)
+ */
+PhoneGap.Media.getMediaObject = function(id) {
+    return PhoneGap.mediaObjects[id];
+};
+
+/**
+ * Audio has status update.
+ * PRIVATE
+ *
+ * @param id            The media object id (string)
+ * @param status        The status code (int)
+ * @param msg           The status message (string)
+ */
+PhoneGap.Media.onStatus = function(id, msg, value) {
+    var media = PhoneGap.mediaObjects[id];
+    // If state update
+    if (msg === Media.MEDIA_STATE) {
+        if (value === Media.MEDIA_STOPPED) {
+            if (media.successCallback) {
+                media.successCallback();
+            }
+        }
+        if (media.statusCallback) {
+            media.statusCallback(value);
+        }
+    }
+    else if (msg === Media.MEDIA_DURATION) {
+        media._duration = value;
+    }
+    else if (msg === Media.MEDIA_ERROR) {
+        if (media.errorCallback) {
+            media.errorCallback({"code":value});
+        }
+    }
+    else if (msg === Media.MEDIA_POSITION) {
+        media._position = value;
+    }
+};
+}

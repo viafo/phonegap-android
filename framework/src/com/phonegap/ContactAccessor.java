@@ -1,11 +1,3 @@
-// Taken from Android Tutorials
-/*
- * PhoneGap is available under *either* the terms of the modified BSD license *or* the
- * MIT License (2008). See http://opensource.org/licenses/alphabetical for full text.
- * 
- * Copyright (c) 2005-2010, Nitobi Software Inc.
- * Copyright (c) 2010, IBM Corporation
- */
 /*
  * Copyright (C) 2009 The Android Open Source Project
  *
@@ -24,7 +16,6 @@
 
 package com.phonegap;
 
-import java.lang.reflect.Constructor;
 import java.util.HashMap;
 
 import android.app.Activity;
@@ -43,55 +34,11 @@ import org.json.JSONObject;
  * Eclair or higher, we want to use {@link ContactAccessorSdk5}.
  */
 public abstract class ContactAccessor {
-	
-    /**
-     * Static singleton instance of {@link ContactAccessor} holding the
-     * SDK-specific implementation of the class.
-     */
-    private static ContactAccessor sInstance;
+  
     protected final String LOG_TAG = "ContactsAccessor";
     protected Activity mApp;
     protected WebView mView;
-
-    public static ContactAccessor getInstance(WebView view, Activity app) {
-        if (sInstance == null) {
-            String className;
-
-            /*
-             * Check the version of the SDK we are running on. Choose an
-             * implementation class designed for that version of the SDK.
-             *
-             * Unfortunately we have to use strings to represent the class
-             * names. If we used the conventional ContactAccessorSdk5.class.getName()
-             * syntax, we would get a ClassNotFoundException at runtime on pre-Eclair SDKs.
-             * Using the above syntax would force Dalvik to load the class and try to
-             * resolve references to all other classes it uses. Since the pre-Eclair
-             * does not have those classes, the loading of ContactAccessorSdk5 would fail.
-             */
-            
-            if (android.os.Build.VERSION.RELEASE.startsWith("1.")) {
-                className = "com.phonegap.ContactAccessorSdk3_4";
-            } else {
-                className = "com.phonegap.ContactAccessorSdk5";
-            }
-
-            /*
-             * Find the required class by name and instantiate it.
-             */
-            try {
-                Class<? extends ContactAccessor> clazz =
-                        Class.forName(className).asSubclass(ContactAccessor.class);
-                // Grab constructor for contactsmanager class dynamically.
-                Constructor<? extends ContactAccessor> classConstructor = clazz.getConstructor(Class.forName("android.webkit.WebView"), Class.forName("android.app.Activity"));
-                sInstance = classConstructor.newInstance(view, app);
-            } catch (Exception e) {
-                throw new IllegalStateException(e);
-            }
-        }
-
-        return sInstance;
-    }
-	
+  
     /**
      * Check to see if the data associated with the key is required to 
      * be populated in the Contact object.
@@ -100,101 +47,117 @@ public abstract class ContactAccessor {
      * @return true if the key data is required
      */
     protected boolean isRequired(String key, HashMap<String,Boolean> map) {
-		Boolean retVal = map.get(key);
-		return (retVal == null) ? false : retVal.booleanValue();
-	}
+    Boolean retVal = map.get(key);
+    return (retVal == null) ? false : retVal.booleanValue();
+  }
     
     /**
      * Create a hash map of what data needs to be populated in the Contact object
      * @param fields the list of fields to populate
      * @return the hash map of required data
      */
-	protected HashMap<String,Boolean> buildPopulationSet(JSONArray fields) {
-		HashMap<String,Boolean> map = new HashMap<String,Boolean>();
-		
-		String key;
-		try {
-			for (int i=0; i<fields.length(); i++) {
-				key = fields.getString(i);
-				if (key.startsWith("displayName")) {
-					map.put("displayName", true);
-				}
-				else if (key.startsWith("name")) {
-					map.put("name", true);
-				}
-				else if (key.startsWith("nickname")) {
-					map.put("nickname", true);
-				}
-				else if (key.startsWith("phoneNumbers")) {
-					map.put("phoneNumbers", true);
-				}
-				else if (key.startsWith("emails")) {
-					map.put("emails", true);
-				}
-				else if (key.startsWith("addresses")) {
-					map.put("addresses", true);
-				}
-				else if (key.startsWith("ims")) {
-					map.put("ims", true);
-				}
-				else if (key.startsWith("organizations")) {
-					map.put("organizations", true);
-				}
-				else if (key.startsWith("birthday")) {
-					map.put("birthday", true);
-				}
-				else if (key.startsWith("anniversary")) {
-					map.put("anniversary", true);
-				}
-				else if (key.startsWith("note")) {
-					map.put("note", true);
-				}
-				else if (key.startsWith("relationships")) {
-					map.put("relationships", true);
-				}
-				else if (key.startsWith("urls")) {
-					map.put("urls", true);
-				}
-				else if (key.startsWith("photos")) {
-					map.put("photos", true);
-				}
-			}
-		}
-		catch (JSONException e) {
-			Log.e(LOG_TAG, e.getMessage(), e);
-		}
-		return map;
-	}
-	
-	/**
-	 * Convenience method to get a string from a JSON object.  Saves a 
-	 * lot of try/catch writing.
-	 * If the property is not found in the object null will be returned.
-	 * 
-	 * @param obj contact object to search
-	 * @param property to be looked up
-	 * @return The value of the property
-	 */
-	protected String getJsonString(JSONObject obj, String property) {
-		String value = null;
-		try {
-			value = obj.getString(property);
-			if (value.equals("null")) {
-				Log.d(LOG_TAG, property + " is string called 'null'");
-				value = null;
-			}
-		}
-		catch (JSONException e) {
-			Log.d(LOG_TAG, "Could not get = " + e.getMessage());
-		}		
-		return value;
-	}
+  protected HashMap<String,Boolean> buildPopulationSet(JSONArray fields) {
+    HashMap<String,Boolean> map = new HashMap<String,Boolean>();
+    
+    String key;
+    try {
+        if (fields.length() == 1 && fields.getString(0).equals("*")) {
+                map.put("displayName", true);
+                map.put("name", true);
+                map.put("nickname", true);
+                map.put("phoneNumbers", true);
+                map.put("emails", true);
+                map.put("addresses", true);
+                map.put("ims", true);
+                map.put("organizations", true);
+                map.put("birthday", true);
+                map.put("note", true);
+                map.put("urls", true);
+                map.put("photos", true);
+                map.put("categories", true);
+        } 
+        else {
+          for (int i=0; i<fields.length(); i++) {
+            key = fields.getString(i);
+            if (key.startsWith("displayName")) {
+              map.put("displayName", true);
+            }
+            else if (key.startsWith("name")) {
+              map.put("name", true);
+            }
+            else if (key.startsWith("nickname")) {
+              map.put("nickname", true);
+            }
+            else if (key.startsWith("phoneNumbers")) {
+              map.put("phoneNumbers", true);
+            }
+            else if (key.startsWith("emails")) {
+              map.put("emails", true);
+            }
+            else if (key.startsWith("addresses")) {
+              map.put("addresses", true);
+            }
+            else if (key.startsWith("ims")) {
+              map.put("ims", true);
+            }
+            else if (key.startsWith("organizations")) {
+              map.put("organizations", true);
+            }
+            else if (key.startsWith("birthday")) {
+              map.put("birthday", true);
+            }
+            else if (key.startsWith("note")) {
+              map.put("note", true);
+            }
+            else if (key.startsWith("urls")) {
+              map.put("urls", true);
+            }
+                    else if (key.startsWith("photos")) {
+                        map.put("photos", true);
+                    }
+                    else if (key.startsWith("categories")) {
+                        map.put("categories", true);
+                    }
+          }
+        }
+    }
+    catch (JSONException e) {
+      Log.e(LOG_TAG, e.getMessage(), e);
+    }
+    return map;
+  }
+  
+  /**
+   * Convenience method to get a string from a JSON object.  Saves a 
+   * lot of try/catch writing.
+   * If the property is not found in the object null will be returned.
+   * 
+   * @param obj contact object to search
+   * @param property to be looked up
+   * @return The value of the property
+   */
+  protected String getJsonString(JSONObject obj, String property) {
+    String value = null;
+    try {
+        if (obj != null) {
+      value = obj.getString(property);
+          if (value.equals("null")) {
+            Log.d(LOG_TAG, property + " is string called 'null'");
+            value = null;
+          }
+        }
+    }
+    catch (JSONException e) {
+      Log.d(LOG_TAG, "Could not get = " + e.getMessage());
+    }   
+    return value;
+  }
 
     /**
      * Handles adding a JSON Contact object into the database.
      * @return TODO
      */
-	public abstract boolean save(JSONObject contact);
+  public abstract String save(JSONObject contact);
 
     /**
      * Handles searching through SDK-specific contacts API.
@@ -202,27 +165,33 @@ public abstract class ContactAccessor {
     public abstract JSONArray search(JSONArray filter, JSONObject options);
 
     /**
+     * Handles searching through SDK-specific contacts API.
+     * @throws JSONException 
+     */
+    public abstract JSONObject getContactById(String id) throws JSONException;
+
+    /**
      * Handles removing a contact from the database.
      */
-	public abstract boolean remove(String id);
-	
-	/**
-	 * A class that represents the where clause to be used in the database query 
-	 */
-	class WhereOptions {
-		private String where;
-		private String[] whereArgs;
-		public void setWhere(String where) {
-			this.where = where;
-		}
-		public String getWhere() {
-			return where;
-		}
-		public void setWhereArgs(String[] whereArgs) {
-			this.whereArgs = whereArgs;
-		}
-		public String[] getWhereArgs() {
-			return whereArgs;
-		}
-	}
+  public abstract boolean remove(String id);
+  
+  /**
+   * A class that represents the where clause to be used in the database query 
+   */
+  class WhereOptions {
+    private String where;
+    private String[] whereArgs;
+    public void setWhere(String where) {
+      this.where = where;
+    }
+    public String getWhere() {
+      return where;
+    }
+    public void setWhereArgs(String[] whereArgs) {
+      this.whereArgs = whereArgs;
+    }
+    public String[] getWhereArgs() {
+      return whereArgs;
+    }
+  }
 }
